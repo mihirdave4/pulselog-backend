@@ -1,0 +1,83 @@
+version: "3.9"
+
+services:
+
+  db:
+    image: postgres:16
+    container_name: pulselog_db
+    restart: always
+    environment:
+      POSTGRES_DB: pulselog
+      POSTGRES_USER: pulselog
+      POSTGRES_PASSWORD: pulselog
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    container_name: pulselog_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  web:
+    build: ./backend
+    container_name: pulselog_web
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    environment:
+      DEBUG: "False"
+      POSTGRES_DB: pulselog
+      POSTGRES_USER: pulselog
+      POSTGRES_PASSWORD: pulselog
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+  celery:
+    build: ./backend
+    container_name: pulselog_celery
+    command: celery -A config worker --loglevel=info
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - db
+      - redis
+    environment:
+      POSTGRES_DB: pulselog
+      POSTGRES_USER: pulselog
+      POSTGRES_PASSWORD: pulselog
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+  celery_beat:
+    build: ./backend
+    container_name: pulselog_beat
+    command: celery -A config beat --loglevel=info
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - db
+      - redis
+    environment:
+      POSTGRES_DB: pulselog
+      POSTGRES_USER: pulselog
+      POSTGRES_PASSWORD: pulselog
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+volumes:
+  postgres_data:
